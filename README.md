@@ -94,6 +94,16 @@ orchestrator's threshold choice), and **segment disparity** (FPR/FNR per
 geography and customer segment). Ground-truth labels are consumed *only* here; a
 feature whitelist + leakage test keep `*_gt` columns out of the models.
 
+## Real-data validation
+
+The supervised modeling stack is also validated on a real external dataset (ULB
+[Credit Card Fraud Detection](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud),
+284,807 transactions, 0.173% fraud) — not just the synthetic world. On an honest
+temporal split it reaches **PR-AUC 0.80 / ROC-AUC 0.972** with calibrated
+probabilities and a cost-optimal threshold. Run it with
+`uv run python scripts/real_data_test.py`; the full methodology and rationale are
+in [docs/real-data-evaluation.md](docs/real-data-evaluation.md).
+
 ## Audit trail
 
 `src/audit/` is append-only and hash-chained
