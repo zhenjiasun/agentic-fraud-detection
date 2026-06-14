@@ -9,11 +9,25 @@ showcase of fraud ML + graph analysis + agent security + human-in-the-loop + AI
 evaluation + model governance + monitoring). Not a library; a runnable system.
 Runs fully offline (mock LLM) and must stay that way for CI.
 
+## Tooling: uv + Rust
+
+- Python env/deps via **uv** (`uv venv && uv sync`; `uv.lock` committed). Run things
+  with `uv run ...`.
+- **Rust core** `fraudguard_core` (`rust/`, pyo3 + maturin) implements the CPU-bound
+  hot paths: `detect_rings` (graph) and `velocity_24h` (feature kernel). Build with
+  `uv run maturin develop -m rust/Cargo.toml --release`.
+- The Rust core is **optional**: `src/graph/rings.py` and `src/models/features.py`
+  `import fraudguard_core` behind `try/except` and fall back to equivalent pure
+  Python. Keep that fallback working — never make the Rust extension a hard import.
+- Rust functions must stay **result-equivalent** to the Python fallback (the test
+  suite passes with either). If you change one, change both.
+
 ## Run / verify
 
-- `python bootstrap.py` — full pipeline (seed→graph→train→score→queue→investigate→evaluate→monitor).
-- `python run_api.py` (FastAPI :8000) then `python run_dashboard.py` (Dash :8050).
-- `pytest` — 58 hermetic tests; `conftest.py` forces `LLM_PROVIDER=mock`.
+- `uv run python bootstrap.py` — full pipeline (seed→graph→train→score→queue→investigate→evaluate→monitor).
+- `uv run python run_api.py` (FastAPI :8000) then `uv run python run_dashboard.py` (Dash :8050).
+- `uv run pytest` — 58 hermetic tests; `conftest.py` forces `LLM_PROVIDER=mock`.
+  `pythonpath=["."]` in pyproject makes `src` importable under the pytest console script.
 
 ## Architecture invariants (do not break)
 

@@ -1,0 +1,12 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "fraudguard-core"
+version = "0.1.0"
+description = "Rust core for FraudGuard (graph ring detection + transaction velocity)."
+requires-python = ">=3.10"
+
+[tool.maturin]
+module-name = "fraudguard_core"
