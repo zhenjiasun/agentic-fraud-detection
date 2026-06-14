@@ -1,0 +1,47 @@
+# Declarative rules. `when` is a boolean expression over four namespaces:
+#   account.*  graph.*  txn.*  model.*
+# Evaluated by a restricted AST interpreter (src/rules/engine.py) — NEVER eval().
+# action ∈ {auto_block, auto_allow, route_to_review}; high-confidence rules
+# short-circuit the orchestrator.
+rules:
+  - id: R001_card_testing_velocity
+    when: "txn.max_cards_on_device >= 8 and account.decline_rate >= 0.3"
+    action: auto_block
+    reason_code: CARD_TESTING_VELOCITY
+    confidence: high
+
+  - id: R002_ring_high_score
+    when: "graph.ring_member == 1 and model.account_score > 0.7"
+    action: auto_block
+    reason_code: RING_LINKED
+    confidence: high
+
+  - id: R003_ato_new_geo_highvalue
+    when: "txn.new_geo_high_value == 1 and model.account_score > 0.4"
+    action: route_to_review
+    reason_code: ATO_SUSPECTED
+    confidence: medium
+
+  - id: R004_datacenter_anomaly
+    when: "txn.datacenter_share > 0.5 and txn.max_amount_z > 3"
+    action: route_to_review
+    reason_code: DATACENTER_ANOMALY
+    confidence: medium
+
+  - id: R005_bust_out_limit
+    when: "account.max_amount_to_limit > 0.55 and account.spend_trajectory > 0.5"
+    action: route_to_review
+    reason_code: BUST_OUT_PATTERN
+    confidence: medium
+
+  - id: R006_synthetic_identity_share
+    when: "txn.n_users_on_identity >= 2 and account.account_age_days < 60"
+    action: route_to_review
+    reason_code: SYNTHETIC_IDENTITY
+    confidence: medium
+
+  - id: R007_trusted_aged_account
+    when: "model.account_score < 0.02 and account.account_age_days > 200 and graph.ring_member == 0"
+    action: auto_allow
+    reason_code: TRUSTED_AGED_ACCOUNT
+    confidence: high
