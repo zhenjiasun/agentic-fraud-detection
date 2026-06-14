@@ -94,6 +94,12 @@ orchestrator's threshold choice), and **segment disparity** (FPR/FNR per
 geography and customer segment). Ground-truth labels are consumed *only* here; a
 feature whitelist + leakage test keep `*_gt` columns out of the models.
 
+The block threshold is a cost decision, not a constant: `orchestrator.threshold_mode`
+switches between a single global cutoff and an **amount-aware** policy that blocks
+when `score·exposure > (1-score)·fp_cost`. `build_report` reports both head-to-head,
+and `scripts/threshold_experiments.py` sweeps the cost knobs on real data — see
+[docs/cost-sensitive-thresholding.md](docs/cost-sensitive-thresholding.md).
+
 ## Real-data validation
 
 The supervised modeling stack is also validated on a real external dataset (ULB
