@@ -1,0 +1,53 @@
+# Non-secret defaults for fraudguard. Secrets live in .env.
+
+seed: 1337
+
+paths:
+  db: data/fraudguard.db
+  audit_log: data/audit.log.jsonl
+  saved_models: saved_models
+
+simulator:
+  n_users: 1200
+  n_merchants: 120
+  days: 45
+  base_txn_per_user: 18          # mean transactions per user over the window
+  fraud:
+    # Counts of injected fraud campaigns per archetype (kept small -> ~1-3% base rate).
+    account_takeover: 35
+    card_testing: 25
+    bust_out: 20
+    money_mule_ring: 6           # rings, each spawns several mule accounts
+    synthetic_identity: 18
+  # Realism knobs: legit users who travel/burst (hard negatives) and low-intensity
+  # fraud (soft positives) create a genuine ambiguous band for review + the agent.
+  hard_negative_rate: 0.06
+  soft_positive_intensity: 0.45
+
+graph:
+  min_users_for_shared_device: 3   # device shared by >= N users seeds a ring
+  min_users_for_shared_ip: 4
+  community_min_size: 3
+
+models:
+  test_fraction: 0.25              # temporal tail held out
+  calibration_fraction: 0.15      # carved from the train head for calibrator fitting
+  n_estimators: 300
+  max_depth: 5
+  learning_rate: 0.08
+
+orchestrator:
+  # Calibrated-probability thresholds; defaults are refined from the expected-loss
+  # curve in src/analysis/evaluation.py and may be overwritten after evaluation.
+  t_low: 0.15                     # below -> auto_allow
+  t_high: 0.80                    # above -> auto_block
+  fp_cost: 25.0                   # $ friction cost of blocking a legit transaction
+  # fn_cost is the transaction amount itself (fraud loss).
+
+monitoring:
+  psi_warn: 0.10
+  psi_alert: 0.25
+
+agent:
+  max_tool_calls: 8               # hard cap on the investigator's tool loop
+  max_rationale_chars: 1200
