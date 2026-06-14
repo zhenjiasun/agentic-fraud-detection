@@ -8,14 +8,29 @@ itself as an attack surface.
 Everything runs **offline with no API key** (the LLM investigator defaults to a
 deterministic mock). Switch to Claude, OpenAI, or DeepSeek with one env var.
 
+Tooling is **uv** (Python env/deps) + a **Rust core** (`fraudguard_core`, built
+with maturin) for the CPU-bound graph + feature hot paths.
+
 ```bash
-pip install -r requirements.txt
-cp .env.example .env          # LLM_PROVIDER=mock by default — no key needed
-python bootstrap.py           # seed → graph → train → score → queue → investigate → evaluate → monitor
-python run_api.py             # FastAPI backend on :8000
-python run_dashboard.py       # Dash dark dashboard on :8050
-pytest                        # 58 hermetic tests, fully offline
+# Python env + deps (uv)
+uv venv && uv sync                       # or: uv pip install -e .
+cp .env.example .env                     # LLM_PROVIDER=mock by default — no key
+
+# Build the Rust core (needs a Rust toolchain: `brew install rust` or rustup)
+uv pip install maturin
+uv run maturin develop -m rust/Cargo.toml --release
+
+# Run
+uv run python bootstrap.py               # seed→graph→train→score→queue→investigate→evaluate→monitor
+uv run python run_api.py                 # FastAPI backend on :8000
+uv run python run_dashboard.py           # Dash dark dashboard on :8050
+uv run pytest                            # 58 hermetic tests, fully offline
 ```
+
+The Rust core is **optional** — if the extension isn't built, the graph ring
+detection and transaction-velocity kernels transparently fall back to equivalent
+pure-Python implementations, so `uv pip install -e .` alone still runs everything
+(plain `pip install -r requirements.txt` + `python bootstrap.py` also works).
 
 ## What it does
 
@@ -87,10 +102,24 @@ tampering; the dashboard shows a green/red integrity badge. Every rule fire,
 model action, investigation, injection attempt, and human decision is
 reconstructable from the log alone.
 
+## Rust core
+
+`rust/` is a pyo3 crate (`fraudguard_core`) built with maturin into the uv venv.
+It implements the two CPU-bound hot paths with results identical to the Python
+fallbacks:
+- `detect_rings` — union-find clustering on the user/infrastructure graph (the
+  graph layer's heavy loop), used by `src/graph/rings.py`.
+- `velocity_24h` — per-user count of prior transactions within 24h (the feature
+  kernel run right after the simulator), used by `src/models/features.py`.
+
+Each call site does `import fraudguard_core` behind a `try/except` and falls back
+to pure Python when the extension isn't present.
+
 ## Layout
 
 ```
 bootstrap.py            one command for the whole pipeline
+rust/                   pyo3 crate (fraudguard_core): ring detection + velocity
 src/data/               simulator, archetypes, SQLite store (single source of truth)
 src/graph/              entity graph, ring detection, graph features
 src/models/             XGBoost risk models, calibration, registry, pipeline

@@ -12,6 +12,13 @@ import pandas as pd
 
 from src.data.schema import BASE_DATE, HIGH_RISK_MCC
 
+try:  # Rust core is optional — pure-Python fallback below keeps it runnable
+    import fraudguard_core as _fc
+    _CORE = True
+except ImportError:  # pragma: no cover
+    _fc = None
+    _CORE = False
+
 TXN_FEATURES = [
     "log_amount", "amount_z", "amount_to_limit", "hour",
     "is_high_risk_mcc", "is_datacenter_ip", "geo_mismatch", "is_declined",
@@ -74,17 +81,22 @@ def build_txn_features(store, graph_feats: pd.DataFrame) -> pd.DataFrame:
 
 
 def _velocity_24h(df: pd.DataFrame) -> pd.Series:
-    """Count of the same user's transactions in the prior 24h (causal)."""
-    out = pd.Series(0, index=df.index, dtype=int)
+    """Count of the same user's transactions in the prior 24h (causal).
+
+    Runs in the Rust core when available; identical pure-Python fallback below.
+    """
     sec = _epoch(df["ts"])
+    if _CORE:
+        counts = _fc.velocity_24h(df["user_id"].tolist(),
+                                  [int(s) for s in sec.tolist()])
+        return pd.Series(counts, index=df.index, dtype=int)
+    out = pd.Series(0, index=df.index, dtype=int)
     for _, idx in df.groupby("user_id").groups.items():
         order = sec.loc[idx].sort_values()
         times = order.values
-        # for each txn, number of prior txns within 24h
         lo = np.searchsorted(times, times - 86400, side="left")
         pos = np.arange(len(times))
-        counts = pos - lo
-        out.loc[order.index] = counts
+        out.loc[order.index] = pos - lo
     return out
 
 

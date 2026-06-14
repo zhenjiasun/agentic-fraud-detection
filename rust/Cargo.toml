@@ -1,0 +1,12 @@
+[package]
+name = "fraudguard_core"
+version = "0.1.0"
+edition = "2021"
+description = "Rust core (pyo3) for FraudGuard: graph ring detection + transaction velocity hot paths."
+
+[lib]
+name = "fraudguard_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module"] }
