@@ -14,6 +14,10 @@ never as a feature).
 
 Split discipline mirrors src/models/pipeline.py: temporal train/test, with the
 calibrator fit on the tail of the train head (no look-ahead).
+
+Dataset: "Credit Card Fraud Detection" by the ULB Machine Learning Group,
+https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud (CC BY-SA 4.0). Fetched
+on demand into data/real/creditcard.csv (gitignored); not committed.
 """
 from __future__ import annotations
 
