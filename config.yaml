@@ -40,9 +40,17 @@ orchestrator:
   # Calibrated-probability thresholds; defaults are refined from the expected-loss
   # curve in src/analysis/evaluation.py and may be overwritten after evaluation.
   t_low: 0.15                     # below -> auto_allow
-  t_high: 0.80                    # above -> auto_block
+  t_high: 0.80                    # above -> auto_block (also a safety ceiling in amount_aware mode)
   fp_cost: 25.0                   # $ friction cost of blocking a legit transaction
   # fn_cost is the transaction amount itself (fraud loss).
+  # threshold_mode:
+  #   global       -> block when score >= t_high (one cutoff for every account)
+  #   amount_aware -> also block when expected fraud loss beats friction cost, i.e.
+  #                   score*exposure > (1-score)*fp_cost. The loss-minimizing cutoff
+  #                   is fp_cost/exposure, so high-exposure accounts are blocked at a
+  #                   lower probability. ~21% lower expected loss on the real ULB test
+  #                   set at fp_cost=25 (see docs/cost-sensitive-thresholding.md).
+  threshold_mode: global
 
 monitoring:
   psi_warn: 0.10

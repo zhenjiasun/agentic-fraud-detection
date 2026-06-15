@@ -70,6 +70,9 @@ def build_account_context(store) -> pd.DataFrame:
     ctx = acct.set_index("user_id").join(agg).fillna(0)
     ctx["account_score"] = ctx.index.map(a_scores).fillna(0)
     ctx["n_users_on_identity"] = ctx.index.map(n_users_on_identity).fillna(1)
+    # dollars at stake per account (observable; reverses the log1p in features) — the
+    # exposure term in amount_aware thresholding. Not a *_gt column: no leakage.
+    ctx["exposure"] = np.expm1(ctx["log_total_spend"].clip(lower=0))
     return ctx.reset_index()
 
 
@@ -104,14 +107,19 @@ def _ctx_namespaces(row) -> dict[str, dict]:
     }
 
 
-def _decide(fired: list[dict], score: float, ring_member: int, t_low, t_high) -> str:
+def _decide(fired: list[dict], score: float, ring_member: int, t_low, t_high,
+            *, mode: str = "global", exposure: float = 0.0, fp_cost: float = 25.0) -> str:
     high = [f for f in fired if f["confidence"] == "high"]
     if any(f["action"] == "auto_block" for f in high):
         return "auto_block"
+    # amount_aware: block when the expected fraud loss saved (score*exposure) beats
+    # the friction cost of a wrongful block ((1-score)*fp_cost). t_high stays a safety
+    # ceiling so a near-certain account still blocks even on thin recorded exposure.
+    block_by_loss = mode == "amount_aware" and score * exposure > (1.0 - score) * fp_cost
     if any(f["action"] == "auto_allow" for f in high):
         # a high-confidence allow still defers to a hard block rule (handled above)
         action = "auto_allow"
-    elif score >= t_high:
+    elif score >= t_high or block_by_loss:
         action = "auto_block"
     elif score <= t_low:
         action = "auto_allow"
@@ -130,6 +138,8 @@ def run_orchestrator(store, settings) -> dict:
     engine = RulesEngine(load_rules(ROOT / "config" / "rules.yaml"))
     ocfg = settings.orchestrator
     t_low, t_high = ocfg["t_low"], ocfg["t_high"]
+    mode = ocfg.get("threshold_mode", "global")
+    fp_cost = ocfg.get("fp_cost", 25.0)
 
     ctx_df = build_account_context(store)
     queue = ReviewQueue(store, audit)
@@ -147,7 +157,8 @@ def run_orchestrator(store, settings) -> dict:
                          payload={"rule": f["id"], "reason_code": f["reason_code"]})
 
         action = _decide(fired, row["account_score"], int(row["g_ring_member"]),
-                         t_low, t_high)
+                         t_low, t_high, mode=mode, exposure=float(row["exposure"]),
+                         fp_cost=fp_cost)
         counts[action] += 1
         reason_codes = [f["reason_code"] for f in fired]
         store.insert_decision(
